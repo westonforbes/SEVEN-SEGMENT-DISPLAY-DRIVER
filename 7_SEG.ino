@@ -1,0 +1,113 @@
+#include "LedControl.h"
+#define DIN 2
+#define CS 3
+#define CLK 4
+LedControl DISP = LedControl(DIN, CLK, CS, 8);
+unsigned long delaytime = 10;
+void setup() {
+  Serial.begin(9600);
+  pinMode(DIN, OUTPUT);
+  pinMode(CS, OUTPUT);
+  pinMode(CLK, OUTPUT);
+  DISP.shutdown(0, false);
+  DISP.setIntensity(0, 1);
+  DISP.clearDisplay(0);
+}
+bool PRINT_INT(signed long int VALUE) {
+  //STORES THE AVAILABLE NUMBER OF DIGIT SEGMENTS TO DISPLAY ON.
+  int SEGMENTS = 8;
+
+  //HOLDS AN ACCUMULATION OF ALL THE DIGITS TO HELP CHECK THE
+  //SPECIAL ZERO CASE.
+  int ZERO_CHECK = 0;
+  
+  //ARRAY TO HOLD EACH DIGIT.
+  int x[SEGMENTS];
+
+  //THIS FLAG IS SET BY THE LEADING NON-ZERO DIGIT,
+  //THIS PREVENTS LEADING ZEROS FROM BEING DISPLAYED.
+  bool DIGIT_FLAG = false;
+
+  //THIS FLAG IS SET IF VALUE IS NEGATIVE.
+  bool NEG_FLAG = false;
+
+  //THIS FLAG IS SET WHEN THE THREAD HAS PROCESSED THE
+  //INSERTION OF THE NEGATIVE SYMBOL.
+  bool NEG_EVAL_FLAG = false;
+
+  //IF THE VALUE IS OUT OF THE DISPLAYABLE RANGE, EXIT.
+  if (VALUE < -9999999 || VALUE > 99999999)
+    return true;
+
+  //IF THE VALUE IS LESS THAN ZERO, SET THE NEGATIVE FLAG
+  //AND INVERT THE VALUE SO THAT IT IS POSITIVE. INVERSION
+  //IS NEEDED FOR INTEGER MODULUS OPERATIONS TO WORK RIGHT.
+  if (VALUE < 0) {
+    NEG_FLAG = true;
+    VALUE = VALUE * -1;
+  }
+
+  //PERFORM MODULUS OPERATIONS TO CHOP UP THE VALUES INTO
+  //THE PROPER ARRAY LOCATIONS.
+  for (int i = 0; i < (SEGMENTS - 1); i++) {
+    x[i] = VALUE % 10;
+    VALUE = VALUE / 10;
+  }
+  x[SEGMENTS - 1] = VALUE;
+
+  //CLEAR THE DISPLAY BEFORE PROCESSING DISPLAY CHARS.
+  DISP.clearDisplay(0);
+
+  //SINCE THIS CODE ELIMINATES LEADING ZEROS, ZERO HAS TO BE
+  //TREATED AS A SPECIAL CASE. ACCUMULATE THE VALUES OF
+  //EACH DIGIT, IF THE ACCUMULATED VALUE IS ZERO THEN
+  //ENTER THE FOLLOWING SPECIAL CASE. NOTE: JUST EVALING
+  //VALUE == 0 DOES NOT WORK, I'VE ALREADY TRIED. ITS TEMPTING.
+  for(int i = SEGMENTS - 1; i >= 0; i--)
+    ZERO_CHECK += x[i];
+
+  //IF THE ACCUMULATED VALUES EQUAL ZERO, EXECUTE THE SPECIAL CASE.
+  if (ZERO_CHECK == 0) {
+    DISP.setDigit(0, 0, (byte)0, false);
+  }
+
+  //OTHERWISE CONTINUE AS NORMAL.
+  else {
+    //FOR EACH DIGIT IN THE ARRAY...
+    for (int i = SEGMENTS - 1; i >= 0; i--) {
+
+      //WHEN THE FIRST NON-ZERO DIGIT IS DETECTED SET A DIGIT FLAG.
+      //THIS IS DONE SO THAT THERE ARE NOT LEADING ZEROS.
+      if (x[i] != 0)
+        DIGIT_FLAG = true;
+
+      //WHEN THE DIGIT FLAG IS SET...
+      if (DIGIT_FLAG) {
+
+        //IF THE VALUE IS NEGATIVE AND THE NEGATIVE SYMBOL
+        //HAS NOT BEEN INSERTED YET, INSERT SYMBOL AT LEADING EDGE.
+        if (NEG_FLAG && !NEG_EVAL_FLAG) {
+          DISP.setChar(0, i + 1, '-', false);
+          NEG_EVAL_FLAG = true;
+        }
+
+        //DISPLAY DIGIT.
+        DISP.setDigit(0, i, (byte)x[i], false);
+      }
+    }
+  }
+
+  //INDICATE SUCCESSFUL EXECUTION.
+  return false;
+}
+void loop() {
+  signed long int INDEX = -999999;
+  INDEX = random(10000000,99999999);
+  PRINT_INT(INDEX);
+  delay(100);
+  /*for (INDEX; INDEX <= 99999999; INDEX++) {
+    PRINT_INT(INDEX);
+    delay(150);
+
+  */
+}
